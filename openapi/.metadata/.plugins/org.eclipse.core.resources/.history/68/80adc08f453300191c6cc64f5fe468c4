@@ -1,0 +1,5 @@
+package com.mulit.contactsapp.service;
+
+public class ContactService {
+
+}
