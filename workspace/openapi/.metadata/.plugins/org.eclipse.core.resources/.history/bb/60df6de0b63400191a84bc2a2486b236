@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+
+<script type = "text/javascript">
+ var url = "http://sample.bmaster.kro.kr/contacts";
+ var url = "http://sample.bmaster.kro.kr/contacts?callback=?";
+ $.ajax({
+	 url: url
+ })
+ 
+ $.getJSON(url2,{pageno:1} , function(data){
+	 console.log("~~~josno callback");
+ 	console.log(data);
+ })
+</script>
+
+<!-- <script> src="http://sample.bmaster.kro.kr/contacts?callback=test"</script> -->
+
+<title>Insert title here</title>
+</head>
+<body>
+
+</body>
+</html>

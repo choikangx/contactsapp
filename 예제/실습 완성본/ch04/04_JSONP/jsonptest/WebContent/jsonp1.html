@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+<script type="text/javascript">
+function test(data) {
+	console.log("## JSONP 작동 방식 이해!!")
+	console.log(data);
+}
+</script>
+<script type="text/javascript" 
+	src="http://tfactory.com:8000/contactsvc4/contacts?output=json&callback=test"></script>
+</head>
+<body>
+	<h2>Console Log를 확인하세요</h2>
+</body>
+</html>

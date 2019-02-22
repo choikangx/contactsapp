@@ -1,0 +1,249 @@
+﻿4.
+
+DROP TABLE tbl_apiKey;
+
+create table tbl_apikey 
+(
+ apiKey varchar2(200) NOT NULL,
+ hostName varchar2(200) NOT NULL, 
+ count number default 0,
+ regdate date default sysdate,
+ updateDate date default sysdate
+);
+
+alter table tbl_apikey add constraint pk_apikey  primary key (apiKey);
+
+
+
+5.
+
+package org.thinker.openapi;
+......
+public class ApiKeyVO implements Serializable{
+    private static final long serialVersionUID = 1L;
+	
+    private String hostName;
+    private String apiKey;
+    private int count;
+    ......
+}
+
+
+
+6.
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper 
+   PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	
+<mapper namespace="apiKey">
+   <select id="select" resultType="org.thinker.openapi.ApiKeyVO">
+      SELECT hostName, apiKey, count 
+      FROM tbl_apikey 
+      WHERE apiKey = #{apiKey}
+   </select>
+   <insert id="insert" parameterType="org.thinker.openapi.ApiKeyVO">
+        INSERT INTO tbl_apikey (hostName, apiKey) values (#{hostName}, #{apiKey})
+   </insert>
+   <update id="updateCnt">
+       UPDATE tbl_apiKey SET count = count+ 1 WHERE apiKey = #{apiKey}
+   </update>
+</mapper> 
+
+
+
+7.
+
+package org.thinker.openapi;
+......
+@Repository("ApiKeyRepository")
+public class ApiKeyRepositoryImpl implements ApiKeyRepository {
+  @Autowired
+  private SqlSession sqlSession;
+  @Override
+  public void create(ApiKeyVO vo)throws ApiKeyException{
+     sqlSession.insert("apiKey.insert", vo );   
+  }
+  @Override
+  public ApiKeyVO read(String apiKey) throws ApiKeyException{
+    return sqlSession.selectOne("apiKey.select",apiKey);
+  }
+  @Override
+  public void update(String apiKey) throws ApiKeyException {
+    sqlSession.update("apiKey.updateCnt",apiKey);    
+  }
+}
+
+
+8.
+
+public String requestNewAPIKey(ApiKeyVO apiKeyVO) throws Exception {
+
+  String apiKey = DigestUtils.md5Hex(UUID.randomUUID().toString());
+  System.out.println("## hostName : " + apiKeyVO);
+  System.out.println("## keyValue: " + apiKey);
+  apiKeyVO.setApiKey(apiKey);
+  try {
+    repository.create(apiKeyVO);
+  } catch (Exception e) {
+    throw new ApiKeyException("SAME KEY IS ALREADY EXIST.");
+  }
+  return apiKey;
+}
+
+
+
+9.
+
+public void checkApiKey(String hostname, String apiKey) throws ApiKeyException {
+  ApiKeyVO vo = repository.read(apiKey);
+  if (vo == null) {
+    throw new ApiKeyException("OPEN API KEY IS UNREGISTED ");
+  }
+  if (hostname == null || hostname.equals(vo.getHostName()) == false) {
+    throw new ApiKeyException("HOSTNAME IS NOT VALID!!");
+  }
+  if (vo.getCount() >= maxCount) {
+    throw new ApiKeyException("EXCESSIVE NUMBER OF REQUEST");
+  }
+  repository.update(apiKey);		//사용 카운트 1증가
+}
+
+
+10.
+
+@Controller
+public class KeyProcessController {
+  @Autowired
+  private ApiKeyProcessor keyProcessor;
+  
+  @RequestMapping(method=RequestMethod.GET, value="/key/request")
+  public String getForm(){    
+    return "keygen";
+  }
+  
+  @RequestMapping(value="/key/makeKey", method=RequestMethod.POST)
+  public ModelAndView makeApiKey(ApiKeyVO apiKeyVO)throws Exception{
+    String keyValue = keyProcessor.requestNewAPIKey(apiKeyVO);
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("apikey", keyValue);
+    mav.setViewName("keyresult");
+    return mav;
+  }
+}
+
+-------------------------
+
+다음 JSP 페이지도 함께 검토함
+src/main/webapp/WEB-INF/views/keygen.jsp
+src/main/webapp/WEB-INF/views/keyresult.jsp
+keygen.jsp 페이지 화면에서 Origin을 입력하고 키 생성 버튼을 누르면 ApiKeyProcessor 객체의 requestNewAPIKe 메서드를 호출해 API KEY를 리턴받음. 그후 keyresult.jsp를 통해 생성된 API KEY를 공개
+
+
+
+
+
+
+11.
+
+** ContactRestController.java **
+
+package com.multi.contactsapp;
+......
+@CrossOrigin(origins="*")
+@RestController
+@RequestMapping(value="contacts")
+public class ContactRestController {
+  @Autowired
+  private ContactService contactService;
+  @Autowired
+  private ApiKeyProcessor keyProcessor;
+@RequestMapping(method = RequestMethod.GET)
+  public ContactList getContactList(
+      @RequestParam(value="key", required=false) String apikey,
+      HttpServletRequest request) throws UnsupportedEncodingException {
+    String origin = (String)request.getHeader("Origin");
+    keyProcessor.checkApiKey(origin, apikey);
+    return contactService.getContactList();
+  }
+}
+
+-------------------------
+
+* 이 예제는 @CrossOrigin Annotation을 이용하여 CORS 지원
+* 서비스가 리소스르 리턴하기 전에 checkApiKey 메서드 호출
+ - 예외가 발생하지 않으면 정상적으로 리소스를 리턴 
+ - 예외가 발생하면 예외처리 과정을 거침
+
+
+
+12.
+
+<beans:bean
+  class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+  <beans:property name="exceptionMappings">
+  <beans:props>
+    <beans:prop key="org.thinker.openapi.ApiKeyException">
+      error/apikey_error
+    </beans:prop>
+    <beans:prop key="java.lang.Exception">error/exception_error</beans:prop>
+  </beans:props>
+  </beans:property>
+</beans:bean>
+
+
+
+13.
+
+<%@ page language="java" contentType="application/json; charset=utf-8"
+    pageEncoding="utf-8"%>
+<%@ page isErrorPage="true" %>
+<%
+    response.setStatus(200);
+%>
+{
+  "status" : "api key error!",
+  "message" : "<%=exception.getMessage() %>"
+}
+
+
+15.
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>API KEY Client</title>
+<script src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+$(function() {
+  $("#getContacts").click(function() {
+    var param = { key : "[발급받은 API KEY]" };
+    $("#list").empty();
+    $.get("http://tfactory.com:8000/APIKeyServer/contacts", param, function(data) {
+      console.log(data);
+      if (data.contacts != null) {
+        var str = "";
+        for (var i=0; i < data.contacts.length; i++) {
+          var c = data.contacts[i];
+          str+= `<div>${c.no}: ${c.name}, ${c.tel}, ${c.address}</div>`;
+        }
+        $("#list").append(str);
+      } else {
+        $("#list").append(JSON.stringify(data));
+      }
+    })
+  })
+})
+</script>
+</head>
+<body>
+  <div>
+    <button id="getContacts">연락처 조회하기</button>
+    <div id="list"></div>
+  </div>
+</body>
+</html>
+
+

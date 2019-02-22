@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="EUC-KR">
+
+
+
+<!-- <script> src="http://sample.bmaster.kro.kr/contacts?callback=test"</script> -->
+
+<title>Insert title here</title>
+<script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+<script type = "text/javascript">
+ var URL = "http://sample.bmaster.kro.kr/contacts";
+ var url2 = "http://sample.bmaster.kro.kr/contacts?callback=?";
+ $.ajax({
+	 url: URL,
+	 type:"GET",
+	 dataType:"jsonp",
+	 jsonp : "callback",
+	 data : {output:"json"}
+ }).done(function(data){
+	 console.log("#jsonp 실행  ajax 함수 이용 !!");
+	 console.log(data);
+ })
+ 
+ $.getJSON(url2,{pageno:1} , function(data){
+	 console.log("~~~josno callback");
+ 	console.log(data);
+ })
+</script>
+</head>
+<body>
+
+</body>
+</html>

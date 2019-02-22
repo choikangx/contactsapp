@@ -1,0 +1,15 @@
+INDEX VERSION 1.131
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\1266177792.index
+\tClientApp\src
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\384454541.index
+\contactsvc\src\main\java
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\394363590.index
+\contactweb\src\main\java
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\4018728475.index
+\APIKeyServer\src\main\java
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\2229926628.index
+\tSimpleProvider\src\main\java
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\3403200691.index
+\contactsvc1_day2_2\src\main\java
+C:\dev\workspace\openapi\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\634888428.index
+\APIKeyServer\src\main\java

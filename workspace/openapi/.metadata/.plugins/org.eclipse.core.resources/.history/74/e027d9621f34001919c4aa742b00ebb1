@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+
+<script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+
+ //html 문서가 완전히 로드된 다음 실행. 
+ $(function() {
+	$.ajax({
+		type:"PUT",
+		url:"/contactsvc1/contacts",
+		dataType:"xml",
+		data: { output:"json"}
+	})
+	.done(function(data){
+		console.log(data);
+	})
+ })
+
+</script>
+
+
+</head>
+<body>
+
+	<div id="a" >ID : a</div>
+	<div class="test"> Class : test	</div>
+	<div class="test main">Class: test main</div>
+	<div > Attribute 없음. </div>
+	
+	<h1>  Test 1 : tag h1 </h1>
+	<h2>  Test 2 : tag h2</h2>
+
+</body>
+</html>

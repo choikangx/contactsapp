@@ -1,0 +1,514 @@
+﻿30.
+
+package com.opensg.oauth2.client;
+
+public class Settings {
+	public static final String CLIENT_ID = "......";
+	public static final String CLIENT_KEY = "......";
+	public static final String AUTHORIZE_URL=
+		"https://bitly.com/oauth/authorize";
+	public static final String ACCES_TOKEN_URL = 
+		"https://api-ssl.bitly.com/oauth/access_token";
+	public static final String REDIRECT_URI = 
+		"http://jcornor.com:8000/bitlytest2/callback.jsp";
+	public static final String SHORTEN_URL_API_URL = 
+		"https://api-ssl.bitly.com/v3/shorten";
+}
+
+
+
+31.
+
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="com.opensg.oauth2.client.*" %>
+<%@ page import="java.util.*" %>
+<%
+	HashMap<String,String> map = new HashMap<String, String>();
+	map.put("client_id", Settings.CLIENT_ID);
+	map.put("redirect_uri", Settings.REDIRECT_URI);
+	map.put("response_type", "code");
+	String url = Settings.AUTHORIZE_URL + "?" + 
+		OAuth2ClientUtil.getParamStringFromMap(map);
+%> 
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=EUC-KR">
+<title>Insert title here</title>
+</head>
+<body>
+	<a href="<%=url%>">bitly 앱 승인 페이지로 이동</a>
+</body>
+</html>
+
+
+
+33.
+
+<%@ page language="java" contentType="text/html; charset=utf-8"
+    pageEncoding="utf-8"%>
+<%@ page import="com.opensg.oauth2.client.*" %>
+<%@ page import="java.util.*" %>
+<%@ page import="org.apache.commons.httpclient.*" %>
+<%@ page import="org.apache.commons.httpclient.methods.*"%>
+<%
+	String queryString = request.getQueryString();
+	HashMap<String,String> map = OAuth2ClientUtil.getMapFromParamString(queryString);
+	//code는 이전 행에서 이미 획득 : callback.jsp?code=xxxxxx
+	map.put("client_id", Settings.CLIENT_ID);
+	map.put("client_secret", Settings.CLIENT_KEY);
+	map.put("redirect_uri", Settings.REDIRECT_URI);
+	map.put("grant_type", "authorization_code");
+	
+	String url = Settings.ACCES_TOKEN_URL;
+	HttpClient client = new HttpClient();
+	client.getParams().setContentCharset("utf-8");
+	PostMethod method = new PostMethod(url);
+	method.addParameter("client_id", map.get("client_id"));
+	method.addParameter("client_secret", map.get("client_secret"));
+	method.addParameter("redirect_uri", map.get("redirect_uri"));
+	method.addParameter("grant_type", map.get("grant_type"));
+	method.addParameter("code", map.get("code"));
+
+	int status = client.executeMethod(method);
+	String result= "";
+	String body="";
+	if (status == 200) {
+		body = method.getResponseBodyAsString();
+		HashMap<String,String> tokenMap = OAuth2ClientUtil.getMapFromParamString(body);
+		session.setAttribute("access_token", tokenMap.get("access_token"));
+		response.sendRedirect("main.jsp");
+	} else {
+		result = "인증 실패!!";
+	}
+%>
+<%=result %>
+
+
+
+35.
+
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<% if (session.getAttribute("access_token") == null) { 
+	response.sendRedirect("index.jsp");	 
+}  %>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=EUC-KR">
+<title>Insert title here</title>
+</head>
+<body>
+	긴 URL : <input type="text" id="long" value="" /><br />
+	<button id="shorten">URL 짧게!!</button>
+	<hr />
+	짧은 URL : <span id="short"></span><br />
+	수신 데이터 : 
+	<pre id="json"></pre>
+	<script type="text/javascript" src="http://code.jquery.com/jquery.js"></script>
+	<script type="text/javascript">
+	var param = { longUrl : ""  };
+	$("#shorten").click(function() {
+		param.longUrl = $("#long").val();
+		$.get("shorten.jsp", param, function(response) {
+			$("#json").html(JSON.stringify(response));	
+			if (response.status_code == 200) {
+				$("#short").html(response.data.url);
+			} else {
+				$("#short").html("오류 발생 : " + response.status_txt)
+			}
+		});		
+	})
+	</script>
+</body>
+</html>
+
+
+
+37.
+
+<%@ page language="java" contentType="application/json; charset=utf-8"
+    pageEncoding="utf-8"%>
+<%@ page import="com.opensg.oauth2.client.*" %>
+<%@ page import="java.util.*" %>
+<%@ page import="org.apache.commons.httpclient.*" %>
+<%@ page import="org.apache.commons.httpclient.methods.*"%>
+<%
+	if (session.getAttribute("access_token") == null) {
+		throw new Exception("access_token is null!!");	
+	}
+	
+	String access_token = (String)session.getAttribute("access_token");
+	String longUrl = request.getParameter("longUrl");
+	HashMap<String,String> map = new HashMap<String,String>();
+	map.put("access_token", access_token);
+	map.put("longUrl", longUrl);
+	String param = OAuth2ClientUtil.getParamStringFromMap(map);
+	
+	String url = Settings.SHORTEN_URL_API_URL + "?" + param;
+	HttpClient client = new HttpClient();
+	client.getParams().setContentCharset("utf-8");
+	GetMethod method = new GetMethod(url);
+	
+	int status = client.executeMethod(method);
+	String result= "";
+	if (status == 200) {
+		result = method.getResponseBodyAsString();
+	} else {
+		result = "{ \"status\" : \"오류 발생 : " + status + "\" }";
+	}	
+%>
+<%=result %>
+
+
+
+
+45.
+
+# datasource 
+spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+spring.datasource.username=sa
+spring.datasource.password=
+spring.datasource.driver-class-name=org.h2.Driver
+
+spring.jpa.hibernate.ddl-auto=create
+
+#user credential
+security.user.name=user1
+security.user.password=1234
+
+
+
+46.
+
+package com.multi.authserver;
+......
+@Entity
+public class Contact {
+	@Id
+	@GeneratedValue
+	private int no;
+	@Column(length=20, nullable=false)
+	private String name;
+	@Column(length=20, nullable=false)
+	private String tel;
+	@Column(length=300)
+	private String address;
+	
+	//생성자, Getter, Setter 자동 생성
+}
+
+
+
+47.
+
+package com.multi.authserver;
+
+import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+
+@RepositoryRestResource
+public interface ContactRepository 
+    extends PagingAndSortingRepository<Contact, Integer>{ }
+
+
+
+50.
+
+<dependency>
+	<groupId>org.springframework.security.oauth</groupId>
+	<artifactId>spring-security-oauth2</artifactId>
+</dependency> 
+
+#client credential
+security.oauth2.client.client-id=client1
+security.oauth2.client.client-secret=1234
+
+
+
+51.
+
+package com.multi.authserver;
+......
+
+@EnableResourceServer
+@EnableAuthorizationServer
+@SpringBootApplication
+public class AuthserverApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(AuthserverApplication.class, args);
+	}
+}
+
+
+
+52.
+
+** implicit grant **
+http://localhost:8080/oauth/authorize?response_type=token&client_id=client1&redirect_uri=http://localhost:8080/client/callback&scope=profile
+
+
+
+54.
+
+** authorization code grant type **
+http://localhost:8080/oauth/authorize?response_type=code&client_id=client1&redirect_uri=http://localhost:8080/client/callback&scope=profile
+
+
+
+56. 
+
+curl -H "Authorization: Bearer f4db8444-a94d-416a-9947-ca4d11731e64" "http://localhost:8080/contacts"
+
+
+
+
+57.
+
+https://github.com/spring-projects/spring-security-oauth/blob/master/spring-security-oauth2/src/test/resources/schema.sql
+
+
+
+59.
+
+spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+spring.datasource.username=sa
+spring.datasource.password=1234
+spring.datasource.driver-class-name=org.h2.Driver
+
+spring.jpa.hibernate.ddl-auto=none
+jdbc
+
+#user credential
+security.user.name=user1
+security.user.password=1234
+
+#client credential
+#security.oauth2.client.client-id=client1
+#security.oauth2.client.client-secret=1234
+security.oauth2.authorization.check-token-access: isAuthenticated()
+
+
+
+60.
+
+package com.multi.authserver;
+......(import 문 생략)
+@EnableAuthorizationServer
+@SpringBootApplication
+public class AuthserverApplication extends AuthorizationServerConfigurerAdapter {
+   @Autowired
+   DataSource dataSource; 
+   @Autowired
+   private AuthenticationManager authenticationManager;
+	
+   public TokenStore jdbcTokenStore() {
+      return new JdbcTokenStore(dataSource);
+   }
+   public ApprovalStore inmemoryApprovalStore() {
+      return new InMemoryApprovalStore();
+   }
+   public AuthorizationCodeServices inmemoryAuthorizationCodeServices() {
+      return new InMemoryAuthorizationCodeServices();
+   }
+   @Override
+   public void configure(ClientDetailsServiceConfigurer configurer) throws Exception {
+      configurer.inMemory()
+         .withClient("client1").secret("1234")
+         .authorizedGrantTypes("authorization_code", "implicit", 
+               "refresh_token", "password", "client_credentials" )
+         .scopes("profile", "read", "message")
+         .accessTokenValiditySeconds(3600).refreshTokenValiditySeconds(-1);
+   }
+    
+   @Override
+   public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
+       endpoints
+          .tokenStore(jdbcTokenStore())
+          .approvalStore(inmemoryApprovalStore())
+          .authorizationCodeServices(inmemoryAuthorizationCodeServices())
+          .authenticationManager(authenticationManager);
+   }
+	
+   public static void main(String[] args) {
+       SpringApplication.run(AuthserverApplication.class, args);
+   }
+}
+
+
+
+
+62.
+
+package com.multi.authserver;
+......(import문 생략)
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+    @Autowired
+    DataSource dataSource; 
+	
+    @Bean
+    public FilterRegistrationBean corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.addAllowedOrigin("*");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        source.registerCorsConfiguration("/**", config);
+        FilterRegistrationBean bean = new FilterRegistrationBean(new CorsFilter(source));
+        bean.setOrder(0);
+        return bean;
+    }
+
+   public TokenStore jdbcTokenStore() {
+       return new JdbcTokenStore(dataSource);
+   }
+	
+   @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+                .antMatchers("/").permitAll()
+                .antMatchers("/contacts/**").authenticated();
+    }
+
+   @Override
+   public void configure(ResourceServerSecurityConfigurer resources) throws Exception {
+      // TODO Auto-generated method stub
+      resources.tokenStore(jdbcTokenStore());
+   }
+}
+
+
+
+
+65.
+
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-jwt</artifactId>
+</dependency>
+
+
+
+66.
+
+......(생략)
+@EnableAuthorizationServer
+@SpringBootApplication
+public class AuthserverApplication extends AuthorizationServerConfigurerAdapter {
+	
+   @Autowired
+   private AuthenticationManager authenticationManager;
+ 
+   @Autowired
+   DataSource dataSource; 
+
+   @Bean
+   public JwtAccessTokenConverter accessTokenConverter() {
+       JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
+       converter.setSigningKey("SECRET KEY");	
+       return converter;
+   }    
+   @Bean
+   public TokenStore tokenStore() {
+       return new JwtTokenStore(accessTokenConverter());
+   }
+    public ApprovalStore inmemoryApprovalStore() {
+        return new InMemoryApprovalStore();
+    }
+    public AuthorizationCodeServices inmemoryAuthorizationCodeServices() {
+        return new InMemoryAuthorizationCodeServices();
+    }
+    @Override
+    public void configure(ClientDetailsServiceConfigurer configurer) throws Exception {
+        configurer.inMemory().withClient("client1").secret("1234")
+            .authorizedGrantTypes("authorization_code", "implicit", 
+                "refresh_token", "password", "client_credentials" )
+            .scopes("profile", "read", "message")
+            .accessTokenValiditySeconds(3600).refreshTokenValiditySeconds(-1);
+    }
+    @Override
+    public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
+          endpoints.tokenStore(tokenStore()).accessTokenConverter(accessTokenConverter())
+              .approvalStore(inmemoryApprovalStore())
+              .authorizationCodeServices(inmemoryAuthorizationCodeServices())
+              .authenticationManager(authenticationManager);
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(AuthserverApplication.class, args);
+    }
+}
+
+
+
+68.
+
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+	
+    @Bean
+    public TokenStore tokenStore() {
+        return new JwtTokenStore(accessTokenConverter());
+    }
+    @Bean
+    public JwtAccessTokenConverter accessTokenConverter() {
+        JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
+        converter.setSigningKey("SECRET KEY");
+        return converter;
+    }
+    @Bean
+    @Primary
+    public DefaultTokenServices tokenServices() {
+        DefaultTokenServices defaultTokenServices = new DefaultTokenServices();
+        defaultTokenServices.setTokenStore(tokenStore());
+        return defaultTokenServices;
+    }
+    @Bean
+    public FilterRegistrationBean corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.addAllowedOrigin("*");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        source.registerCorsConfiguration("/**", config);
+        FilterRegistrationBean bean = new FilterRegistrationBean(new CorsFilter(source));
+        bean.setOrder(0);
+        return bean;
+    }
+    @Override
+    public void configure(ResourceServerSecurityConfigurer config) {
+        config.tokenServices(tokenServices());
+    }
+
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+                .antMatchers("/").permitAll()
+                .antMatchers("/contacts/**").authenticated();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,8 @@
+package com.multi.contactsapp.domain;
+
+
+@xmlRootElement(name="result")
+@xmlAccessorType(xmlAccessType.FIELD)
+public class Result {
+
+}

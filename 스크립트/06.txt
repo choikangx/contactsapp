@@ -1,0 +1,507 @@
+﻿21. 
+
+* 트위터 계정 생성 또는 설정 방법
+  - 트위터 계정 생성 후(또는 기존 계정에 대해) 이메일, 모바일 폰이 설정되어 있는지 확인함.
+  - 설정되지 않았다면 모바일 폰을 설정해야 함. -> 사용자 계정의 '설정 및 개인정보' - '모바일' 메뉴에서 폰 번호를 입력하고 인증 번호를 확인하여 인증한다.
+  - 개발자 계정으로 사용할 것을 신청하기 위해 https://developer.twitter.com로 이동하여 apply 버튼을 클릭한다. 
+* 개발자 계정 등록시 주의할 점
+  - 일단은 개인적인 목적으로 사용할 것으로 등록할 것(I am requesting access for my own personal use) 그래야 신청이 빠르게 처리됨.
+  - Twitter API로 만들려고 하는 목적와 앱의 유형을 등록해야 함.(300자 이상) 
+  - 좀더 자세한 등록 방법은 다음 문서를 참조
+    http://bit.ly/2JaWS0l
+
+
+22. 
+
+** 300자 이상으로 입력하실 문구 생각 안나면 대략 다음 내용 넣으세요 **
+
+As a developer, I wanna studying how to develop OAuth 1.0a Client Application using Twitter. and I am running a blog site in WordPress. I write a lot of articles related to WordPress and WEB site creation. The purpose of the application is to use the WordPress plugin to assist tweets. At the moment there is no purpose other than that.
+
+
+25.
+
+package org.thinker.oauth.controller;
+
+public class Setup {
+    public static final String CONSUMER_KEY =
+  	"[발급받은 Consumer Key]";
+    public static final String CONSUMER_SECRET =
+ 	"[발급받은 Consumer Secret]";
+    public static final String CALLBACK_URL =
+ 	"http://jcornor.com:8000/tClientApp/callback";
+    public static final String REQUEST_TOKEN_URL =
+ 	"https://api.twitter.com/oauth/request_token";
+    public static final String AUTHORIZE_URL =
+ 	"https://api.twitter.com/oauth/authorize";
+    public static final String ACCESS_TOKEN_URL =
+ 	"https://api.twitter.com/oauth/access_token";
+    public static final String RESOURCE_URL = 
+ 	"https://api.twitter.com/1.1/statuses/home_timeline.json";
+}
+
+
+
+27.
+
+public class TwitterRequestServlet extends HttpServlet {  
+     ……
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+          throws ServletException, IOException {	
+        RequestTokenVO vo = new RequestTokenVO();
+        vo.setMethod("GET");
+        vo.setRequestURL(Setup.REQUEST_TOKEN_URL);
+        vo.setCallbackURL(Setup.CALLBACK_URL);
+        vo.setConsumerKey(Setup.CONSUMER_KEY);
+        vo.setConsumerSecretKey(Setup.CONSUMER_SECRET); 
+        vo.sign();
+        TokenSender sender = new TokenSender(TokenSender.TYPE_PARAM);
+        try {
+             sender.sendHttpClient(vo);
+             HttpSession session = request.getSession();
+             String token = vo.getRequestOauthToken();
+             String tokenSecret = vo.getRequestOauthTokenSecret(); 
+             session.setAttribute("RT", token);
+             session.setAttribute("RTS", tokenSecret);
+             response.sendRedirect(Setup.AUTHORIZE_URL + "?" +  
+            OAuthMsgConstants.OAUTH_TOKEN + "=" + vo.getRequestOauthToken());
+        } catch (Exception e) {
+             e.printStackTrace();
+        }	
+     }
+}
+
+
+
+29.
+
+public class TwitterCallBackServlet extends HttpServlet {
+     protected void service(HttpServletRequest request, HttpServletResponse response)
+           throws ServletException, IOException {
+        HttpSession session = request.getSession();
+        String token = (String)session.getAttribute("RT");
+        String tokenSecret = (String)session.getAttribute("RTS");
+ 
+        //requesToken과 verifier는 QueryString 파싱과정에서 얻어짐
+        AccessTokenVO vo = new AccessTokenVO(request.getQueryString());
+        vo.setRequestURL(Setup.ACCESS_TOKEN_URL);
+        vo.setConsumerKey(Setup.CONSUMER_KEY);
+        vo.setConsumerSecretKey(Setup.CONSUMER_SECRET);
+        //vo.setVerifier(accessVO.getVerifier());
+        //vo.setRequestOauthToken(token);
+        vo.setRequestOauthTokenSecret(tokenSecret);
+        vo.setMethod("GET");
+        vo.sign();
+
+        TokenSender sender = new TokenSender(TokenSender.TYPE_PARAM);
+        try {
+           sender.sendHttpClient(vo);
+           session.setAttribute("AT", vo.getRequestOauthToken());
+           session.setAttribute("ATS", vo.getRequestOauthTokenSecret());
+           response.sendRedirect("resource");
+        } catch (Exception e) {
+           e.printStackTrace();
+        }	
+   }
+}
+
+
+30.
+
+public class TwitterResourceServlet extends HttpServlet {	
+     protected void service(HttpServletRequest request, HttpServletResponse response) 
+          throws ServletException, IOException {		
+          //Twitter의 Home_Timeline 정보 접근
+        HttpSession session = request.getSession();
+        String token = (String)session.getAttribute("AT");
+        String tokenSecret = (String)session.getAttribute("ATS");
+
+        ResourceTokenVO vo = new ResourceTokenVO();
+        vo.setMethod("GET");
+        vo.setRequestURL(Setup.RESOURCE_URL);
+        vo.setConsumerKey(Setup.CONSUMER_KEY);
+        vo.setConsumerSecretKey(Setup.CONSUMER_SECRET);
+        vo.setRequestOauthToken(token);
+        vo.setRequestOauthTokenSecret(tokenSecret);
+        vo.sign();
+        
+        TokenSender sender = new TokenSender(TokenSender.TYPE_PARAM);
+        try {
+        sender.sendHttpClient(vo);
+            response.setContentType("application/json");
+            response.getWriter().print(vo.getResult());
+        } catch (Exception e) {
+             e.printStackTrace();
+        }     
+    }
+}
+
+
+
+
+37.
+
+@Controller
+public class RequestTokenController {
+
+     @Autowired
+     private ConsumerService consumerService;
+
+     @Autowired
+     private RequestTokenService requestTokenService;
+	
+     @RequestMapping(value="request_token")
+     public ModelAndView requestToken(HttpServletRequest request) throws Exception {
+		
+          //1. QueryString 또는 Post 파라미터 파싱
+          RequestTokenParam param = new RequestTokenParam(request);
+
+          //2. tbl_oauth_key 테이블에서 ConsumerSecret 정보 읽어옴.
+          ConsumerVO consumerVO = consumerService.selectByConsumerKey(param.getConsumerKey());
+          String consumerSecret = consumerVO.getConsumerSecret();
+		
+          ModelAndView mav = new ModelAndView();
+          mav.setViewName("request_token");
+          try {
+            //3. signature validation!! 유효하지 않으면 예외 발생!
+            param.validateRequestToken(consumerSecret);
+            //4. 유효하다면 RequestToken 생성하여 tbl_request_token 테이블에 저장!!
+            RequestTokenVO tokenVO = new RequestTokenVO();
+            tokenVO.setConsumerKey(consumerVO.getConsumerKey());
+            tokenVO.setCallback(param.getCallback());
+            TokenGenerator.generateRequestToken(tokenVO);
+            requestTokenService.createRequestToken(tokenVO);
+
+            String oauth_callback_confirmed = "true";
+
+            StringBuilder builder = new StringBuilder();
+            builder.append("oauth_token=" + tokenVO.getRequestToken() +"&");
+            builder.append("oauth_token_secret=" + tokenVO.getRequestTokenSecret() +"&");
+            builder.append("oauth_callback_confirmed=" + oauth_callback_confirmed);
+
+            mav.addObject("isValid", true);
+            mav.addObject("message", builder.toString());
+          } catch (Exception e) {
+            //Exception 발생하면 유효하지 않음을 View Page를 통해 알림.
+            mav.addObject("isValid", false);
+            mav.addObject("message", e.getMessage());
+          }
+		 
+          return mav;
+     }
+}
+
+
+39.
+
+<%@ page language="java" contentType="text/html; charset=EUC-KR"
+    pageEncoding="EUC-KR"%>
+<%
+	String message = (String)request.getAttribute("message");
+	boolean isValid = (Boolean)request.getAttribute("isValid");
+	if (isValid) {
+		//response.setContentType("application/x-www-form-urlencoded");
+		response.setContentType("text/plain");
+		response.getWriter().println(message);
+	} else {
+		response.setContentType("text/html");
+%>
+	<h1>InValid Request!!</h1><hr>
+	<br>
+	<h3><%=message %></h3>
+<%
+	}
+%>
+
+
+
+42.
+
+@Controller
+@RequestMapping(value="/authorize") 
+public class AuthorizeController {
+     @Autowired
+     private RequestTokenService requestTokenService;
+     @Autowired
+     private UsersService usersService;
+	
+     @RequestMapping(method=RequestMethod.GET)
+     public ModelAndView authorizeGet(HttpServletRequest request) throws Exception {
+          ModelAndView mav = new ModelAndView();
+          String oauth_token = (String)request.getParameter("oauth_token");
+          if (oauth_token != null) {
+	//1. oauth_token 값으로 tbl_request_token 조회하여 레코드가 존재하지 않으면 오류임.
+	RequestTokenVO requestTokenVO = requestTokenService.getRequestToken(oauth_token);
+	if (requestTokenVO != null) {
+	     mav.setViewName("authorize");
+	     mav.addObject("requestTokenVO", requestTokenVO);
+	}
+          } else {
+	mav.setViewName("authorize_error");
+	mav.addObject("errorMessage", "invalid oauth_token!");
+          }
+          return mav;		
+     }
+     @RequestMapping(method=RequestMethod.POST)
+     public ModelAndView authorizePost(HttpSession session, HttpServletRequest request, 
+          HttpServletResponse response) throws Exception {
+		
+          //1. QueryString 값 파싱
+          String allow_deny = request.getParameter("allow_deny");
+          String oauth_token = request.getParameter("oauth_token");
+          String userid = request.getParameter("userid");
+          String password = request.getParameter("password");
+		
+          //2. 임시 생성된 RequestToken 값 읽어오기(from tbl_request_token)
+          RequestTokenVO tokenVO = (RequestTokenVO)requestTokenService.getRequestToken(oauth_token);
+          ModelAndView mav = new ModelAndView();
+          if(tokenVO == null) {
+	mav.setViewName("authorize_error");
+	mav.addObject("errorMessage", "유효하지 않은 토큰입니다.");
+	return mav;
+          }
+
+          mav.addObject("requestTokenVO", tokenVO);
+          mav.setViewName("authorize");
+          if (allow_deny.equals("allow")) {
+	UsersVO usersVO = null;
+	if (!SessionUtil.isLoginned(session)) {
+	     UsersVO inputVO = new UsersVO(userid, password, "", 0);
+	     usersVO  = usersService.selectUsers(inputVO);
+	     if (usersVO != null) {
+	          SessionUtil.loginUser(session, usersVO);
+	     } else {
+	          //승인 버튼을 눌렀으나 사용자 계정 정보가 올바르지 않다면 다시 authorize 페이지로 이동
+	          mav.addObject("loginResult", "false");
+	          mav.setViewName("authorize");
+	          return mav;		
+	     }
+	}
+	//RequestTokenTable의 UserNo 필드값을 애플리케이션의 접근을 허용한 사용자의 UserNo로 변경
+	tokenVO.setUserNo(SessionUtil.getUserInfo(session).getUserno());
+	requestTokenService.updateUserNo(tokenVO);
+				
+	//로그인된 상태에서 App을 승인하면 Callback URL로 이동
+	response.sendRedirect(tokenVO.getCallback() + 
+		"?oauth_token=" + tokenVO.getRequestToken() + 
+		"&oauth_verifier=" + tokenVO.getVerifier());
+          } else {
+	//승인거부를 하였다면 임시 생성한 RequestToken값을 삭제하고 승인거부 화면 출력
+	requestTokenService.deleteRequestToken(oauth_token);
+	mav.setViewName("authorize_error");
+	mav.addObject("errorMessage", "사용자가 애플리케이션의 접근을 허용하지 않습니다.");
+	SessionUtil.logoutUser(session);
+          }
+          return mav;
+     }
+}
+
+
+
+45.
+
+<%@ page language="java" contentType="text/html; charset=EUC-KR"
+    pageEncoding="EUC-KR"%>
+<%@ page import="com.sds.testprovider.util.*" %>
+<%@ page import="com.sds.testprovider.model.*" %>
+<%
+	RequestTokenVO vo = (RequestTokenVO)request.getAttribute("requestTokenVO");
+	String loginResult = (String)request.getAttribute("loginResult");
+%>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=EUC-KR">
+<title>SimpleProvide</title>
+</head>
+<script type="text/javascript">
+function goAllow() {
+     document.getElementById("f1").submit();
+}
+function goDeny() {
+     //승인거부를 누르면 Provider에서 발급했던 Request token 정보를 삭제한다.
+     //이 예제에서는 tbl_request_toke테이블에서..삭제!
+     document.getElementById("allow_deny").value="deny";
+     document.getElementById("f1").submit();
+}
+</script>
+<body>
+<h2>Simple Provider Authorization!!</h2>
+<hr>
+<% if (loginResult != null && loginResult.equals("false")) { %>
+     <div style="font-color: blue; font-size:13pt;">
+          <b>로그인 실패!!! : 정확한 ID와 암호를 입력하십시오.</b>
+     </div>
+<% } %>	
+     <div>
+          <div style="font-size:16pt;">'<%=vo.getAppName() %>'이 
+                   당신의 계정 정보에 접근하는 것을 허용하시겠습니까?</div>
+          <hr>
+          <form id="f1" method="post" action="authorize">
+	<input type="hidden" id="oauth_token" name="oauth_token" value="<%=vo.getRequestToken() %>" />
+	<input type="hidden" id="allow_deny" name="allow_deny" value="allow" /> 
+<%  if (!SessionUtil.isLoginned(session)) { %>
+	User ID : <input id="userid" name="userid" type="text" /><br/>
+	Password : <input id="password" name="password" type="password" value="" /><br/><br/>
+<% } else { 
+     UsersVO usersVO = SessionUtil.getUserInfo(session); %>			
+	<div><%=usersVO.getUserid() %>(<%=usersVO.getUsername() %>) 님 로그인 중!!</div>
+	<br/><br/>
+<% } %>
+      	<input type="button" value="애플리케이션 승인"  id="allow" onclick="goAllow();">
+      	<input type="button" value="승인 거부"  id="deny" onclick="goDeny();">		
+          </form>
+    </div>
+</body>
+</html>
+
+
+
+
+47.
+
+<%@ page language="java" contentType="text/html; charset=EUC-KR"
+    pageEncoding="EUC-KR"%>
+<%@ page import="com.sds.testprovider.model.*" %>    
+<%
+String errorMessage = (String)request.getAttribute("errorMessage");
+RequestTokenVO tokenVO = (RequestTokenVO)request.getAttribute("requestTokenVO");
+%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=EUC-KR">
+<title>Insert title here</title>
+</head>
+<body>
+<h1>OAuth 접근 불허!!</h1>
+<hr>
+<%=errorMessage %>
+<% if (tokenVO != null) { %>
+<br><br>
+<a href="<%=tokenVO.getCallback() %>">'<%=tokenVO.getAppName() %>' 애플리케이션으로 이동합니다.</a>
+<% } %>
+</body>
+</html>
+
+
+
+
+50.
+@Controller
+public class AccessTokenController {
+
+     @Autowired
+     private RequestTokenService requestTokenService;
+
+     @Autowired
+     private UsersService usersService;
+
+     @Autowired
+     private ConsumerService consumerService;
+	
+     @RequestMapping(value="access_token")
+     public ModelAndView getAccessToken(HttpServletRequest request) throws Exception {
+          //1. 파라미터 파싱
+          AccessTokenParam param = new AccessTokenParam(request);
+          //1.1 DB테이블에서 consumer, requestToken, User 정보 읽음(ConsumerSecret, Password, Verifier 정보 획득)
+          ConsumerVO consumerVO = consumerService.selectByConsumerKey(param.getConsumerKey());
+          RequestTokenVO requestTokenVO = requestTokenService.getRequestToken(param.getRequestToken());
+          UsersVO usersVO = usersService.selectUserByUserNo(requestTokenVO.getUserNo());
+		
+          ModelAndView mav = new ModelAndView();
+          mav.setViewName("access_token");
+          try {
+	//2. signature validation!! 유효하지 않으면 예외 발생!
+	param.validateRequestToken(requestTokenVO.getRequestTokenSecret(), 
+		requestTokenVO.getVerifier() , consumerVO.getConsumerSecret());
+	//2.1 유효하다면 RequestToken 테이블의 레코드 삭제 : 임시 TOken이므로..		requestTokenService.deleteRequestToken(requestTokenVO.getRequestToken());
+			
+	//3. AccessToken 생성
+	AccessTokenVO accessTokenVO = TokenGenerator.generateAccessToken(usersVO, consumerVO);
+			
+	StringBuilder builder = new StringBuilder();
+	builder.append(OAuthMsgConstants.OAUTH_TOKEN + "=" + accessTokenVO.getAccessToken() +"&");
+	builder.append(OAuthMsgConstants.OAUTH_TOKEN_SECRET + "=" + 
+           		accessTokenVO.getAccessTokenSecret() +"&");
+	builder.append("userno=" + accessTokenVO.getUserNo() + "&");
+	builder.append("userid=" + accessTokenVO.getUserID());
+	
+	mav.addObject("isValid", true);
+	mav.addObject("message", builder.toString());
+          } catch (Exception e) {
+	mav.addObject("isValid", false);
+	mav.addObject("message", e.getMessage());
+          }
+          return mav;
+     }
+}
+
+
+
+52.
+
+<%@ page language="java" contentType="text/html; charset=EUC-KR"
+    pageEncoding="EUC-KR"%>
+<%
+	String message = (String)request.getAttribute("message");
+	boolean isValid = (Boolean)request.getAttribute("isValid");
+	if (isValid) {
+		//response.setContentType("application/x-www-form-urlencoded");
+		response.setContentType("text/plain");
+		response.getWriter().println(message);
+	} else {
+		response.setContentType("text/html");
+%>
+<h1>InValid Request!!</h1><hr>
+<br>
+<h3><%=message %></h3>
+<%
+	}
+%>
+
+
+
+
+55.
+
+@Controller
+public class MyInfoController {
+
+     @Autowired
+     private UsersService usersService;
+     @Resource(name="jsonTemplate")
+     private View jsonView;
+     @Autowired
+     private ConsumerService consumerService;
+	
+     @RequestMapping(value="/myinfo")
+     public ModelAndView getMyInfo(HttpServletRequest request) throws Exception {
+          ModelAndView mav = new ModelAndView();
+          try {
+	UsersVO usersVO = validateOAuthToken(request);
+	mav.setView(jsonView);
+	mav.addObject(usersVO);
+          } catch (Exception e) {
+	throw new Exception (e.getMessage());
+          }
+          return mav;
+     }
+
+     //Session으로 이미 인증이 되었거나  OAuthToken이 유효하다면 접근 가능!
+     private UsersVO validateOAuthToken(HttpServletRequest request) throws Exception {
+          OAuthTokenParam param = new OAuthTokenParam(request);
+			
+          long userNo = param.getUserNo();
+          String consumerKey = param.getConsumerKey();
+          UsersVO usersVO = usersService.selectUserByUserNo(userNo);
+          ConsumerVO consumerVO = consumerService.selectByConsumerKey(consumerKey);		
+          param.validateRequestToken(consumerVO.getConsumerSecret(), usersVO.getPassword());
+		
+          return usersVO;
+    }
+}
+
+
+
+
+
+

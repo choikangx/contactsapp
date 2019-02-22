@@ -1,0 +1,502 @@
+﻿11. 
+
+GET /orders/1004?apikey=xasjkdfvssdsdsgrbbrhyj
+
+{
+   "code" : 147,
+   "statusCode" : 401,
+   "message" : "Invalid API Key"
+}
+
+
+
+22.
+
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-oxm</artifactId>
+    <version>${org.springframework-version}</version>
+</dependency>
+
+
+
+24. 
+
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+    <version>${jackson.version}</version>
+</dependency>
+<dependency>
+    <groupId>com.fasterxml.jackson.dataformat</groupId>
+    <artifactId>jackson-dataformat-xml</artifactId>
+    <version>${jackson.version}</version>
+</dependency>
+
+
+25.
+
+** Result.java **
+@XmlRootElement(name="result")
+@XmlAccessorType(XmlAccessType.FIELD)
+public class Result {
+	private String status;
+	private String message;
+	private String key;
+
+	//생성자2개, setter, getter 메서드 작성
+	//toString() 메서드 오버라이딩	
+}
+
+
+26.
+
+** Contact.java **
+@XmlRootElement(name="contact")
+@XmlAccessorType(XmlAccessType.FIELD)
+public class Contact {
+	@XmlAttribute
+	private int no;
+	private String name;
+	private String tel;
+	private String address;
+
+	//생성자2개, setter, getter 메서드 작성
+	//toString() 메서드 오버라이딩
+}
+
+
+27.
+
+** ContactList.java **
+package com.multi.contactsapp.domain;
+......
+@XmlRootElement(name="contactList")
+@XmlAccessorType(XmlAccessType.FIELD)
+public class ContactList {
+	private int pageNo;
+	private int pageSize;
+	private int totalCount;
+	@XmlElement(name="contact")
+	private List<Contact> contacts;
+	
+	//생성자2개, setter, getter 메서드 작성
+	//toString() 메서드 오버라이딩
+}
+
+
+
+28.
+
+** ContactService.java **
+@Service
+public class ContactService {
+  @Autowired
+  private ContactDAO contactDAO;
+  
+  public ContactList getContactList() {
+    List<Contact> contacts = contactDAO.getContactList();
+    ContactList contactList = new ContactList(0, 0, contacts.size(), contacts);
+    return contactList;
+  }
+  
+  public ContactList getContactList(int pageNo, int pageSize) {
+    List<Contact> contacts = contactDAO.getContactList(pageNo, pageSize);
+    int totalCount = contactDAO.getContactCount();    
+    ContactList contactList = new ContactList(pageNo, pageSize, totalCount, contacts);
+    return contactList;  
+  }
+  
+  public Contact getContactOne(Contact c) {
+    return contactDAO.getContactOne(c);
+  }
+  
+  public Result insertContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      int no = contactDAO.insertContact(c);
+      result.setMessage("연락처 추가 성공. 추가된 연락처의 일련번호 :" + no);
+      result.setKey(""+no);
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+  
+  public Result updateContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      int count = contactDAO.updateContact(c);
+      result.setMessage(count + "건의 연락처 변경 성공");
+      result.setKey(c.getNo()+"");
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+  
+  public Result deleteContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      int count = contactDAO.deleteContact(c);
+      result.setMessage(count + "건의 연락처 삭제 성공");
+      result.setKey(c.getNo()+"");
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+}
+
+
+32.
+
+<beans:bean id="jaxb2" class="org.springframework.oxm.jaxb.Jaxb2Marshaller">
+   <beans:property  name="classesToBeBound">
+      <beans:list>
+         <beans:value>com.multi.contactsapp.domain.Contact</beans:value>
+         <beans:value>com.multi.contactsapp.domain.ContactList</beans:value>
+         <beans:value>com.multi.contactsapp.domain.Result</beans:value>
+      </beans:list>
+   </beans:property>
+</beans:bean>
+
+
+33.
+
+<beans:bean id="xmlView" class="org.springframework.web.servlet.view.xml.MarshallingView">
+   <beans:constructor-arg ref="jaxb2"></beans:constructor-arg>	
+</beans:bean>
+
+<beans:bean id="jsonView" 
+    class="org.springframework.web.servlet.view.json.MappingJackson2JsonView">
+</beans:bean>
+
+
+34.
+
+** ContactRestController.java **
+@Controller
+@RequestMapping(value="/contacts")
+public class ContactRestController {
+  
+  @Autowired
+  private ContactService contactService;
+  
+  @Resource(name="xmlView")
+  private View xmlView;
+  
+  @Resource(name="jsonView")
+  private View jsonView;
+
+  @RequestMapping(method=RequestMethod.GET)
+  public ModelAndView getContactList(
+      @RequestParam(value="pageno", required=false, defaultValue="0") int pageNo, 
+      @RequestParam(value="pagesize", required=false, defaultValue="3")int pageSize) {
+    ContactList contactList = null;
+    if (pageNo == 0) {
+      contactList = contactService.getContactList();
+    } else {
+      contactList = contactService.getContactList(pageNo, pageSize);
+    }
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("data", contactList);
+    mav.setView(jsonView);
+    return mav;
+  }
+
+  @RequestMapping(value="{no}", method=RequestMethod.GET)
+  public ModelAndView getContactOne(@PathVariable("no") int no) {
+    Contact c = new Contact();
+    c.setNo(no);
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("data", contactService.getContactOne(c));
+    mav.setView(jsonView);
+    return mav;
+  }
+
+ @RequestMapping(method=RequestMethod.POST)
+  public ModelAndView insertContact(@RequestBody Contact c) {
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("data", contactService.insertContact(c));
+    mav.setView(jsonView);
+    return mav;
+  }
+  @RequestMapping(value="{no}", method=RequestMethod.PUT)
+  public ModelAndView updateContact(@RequestBody Contact c, @PathVariable("no") int no) {
+    c.setNo(no);
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("data", contactService.updateContact(c));
+    mav.setView(jsonView);
+    return mav;
+  }  
+  @RequestMapping(value="{no}", method=RequestMethod.DELETE)
+  public ModelAndView deleteContact(@PathVariable("no") int no) {
+    Contact c = new Contact();
+    c.setNo(no);
+    ModelAndView mav = new ModelAndView();
+    mav.addObject("data", contactService.deleteContact(c));
+    mav.setView(jsonView);
+    return mav;
+  }
+}
+
+
+42.
+
+** Web.xml에 추가 **
+<filter>
+  <filter-name>httpPutFormFilter</filter-name>
+  <filter-class>org.springframework.web.filter.HttpPutFormContentFilter</filter-class>
+</filter>
+
+<filter-mapping>
+  <filter-name>httpPutFormFilter</filter-name>
+  <servlet-name>appServlet</servlet-name>
+</filter-mapping>
+
+
+
+44.
+
+<beans:bean id="contentNegotiationManager"
+  class="org.springframework.web.accept.ContentNegotiationManagerFactoryBean">
+  <beans:property name="favorParameter" value="true" />
+  <beans:property name="parameterName" value="output" />
+  <beans:property name="ignoreAcceptHeader" value="false" />
+  <beans:property name="defaultContentType" value="application/json" />
+
+  <beans:property name="mediaTypes">
+    <beans:map>
+      <beans:entry key="json" value="application/json" />
+      <beans:entry key="xml" value="application/xml" />
+      <beans:entry key="html" value="text/html" />
+    </beans:map>
+  </beans:property>
+</beans:bean>
+
+<beans:bean id="contentNegotiatingViewResolver"
+  class="org.springframework.web.servlet.view.ContentNegotiatingViewResolver">
+  <beans:property name="contentNegotiationManager" ref="contentNegotiationManager"></beans:property>
+  <beans:property name="viewResolvers">
+    <beans:list>
+      <beans:bean class="org.springframework.web.servlet.view.BeanNameViewResolver" />
+      <beans:bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <beans:property name="prefix" value="/WEB-INF/views/" />
+        <beans:property name="suffix" value=".jsp" />
+      </beans:bean>
+    </beans:list>
+  </beans:property>
+  <beans:property name="defaultViews">
+    <beans:list>
+      <beans:ref bean="jsonView" />
+      <beans:ref bean="xmlView" />
+    </beans:list>
+  </beans:property>
+</beans:bean>
+
+
+
+47.
+
+package com.multi.contactsapp;
+......
+
+@Controller
+@RequestMapping(value="/contacts")
+public class ContactRestController {
+	
+	@Autowired
+	private ContactService contactService;
+
+	@RequestMapping(method=RequestMethod.GET)
+	public ModelAndView getContactList() {
+		ModelAndView mav = new ModelAndView();
+		mav.addObject("data", contactService.getContactList());
+		mav.setViewName("contact");
+		return mav;
+	}
+
+}
+
+
+55.
+
+package com.multi.contactsapp;
+......
+
+@RestController
+@RequestMapping(value="contacts")
+public class ContactRestController {
+  
+  @Autowired
+  private ContactService contactService;
+  
+  @RequestMapping(method = RequestMethod.GET)
+  public ContactList getContactList() {
+    return contactService.getContactList();
+  }
+
+  @RequestMapping(method = RequestMethod.POST)
+  public Result insertContact(@RequestBody Contact c) {
+    return contactService.insertContact(c);
+  }
+}
+
+
+
+57.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans ......>
+    <annotation-driven content-negotiation-manager="contentNegotiationManager">
+    </annotation-driven>
+     .......
+    <beans:bean id="contentNegotiationManager"
+        class="org.springframework.web.accept.ContentNegotiationManagerFactoryBean">
+       <beans:property name="favorParameter" value="true" />
+       <beans:property name="parameterName" value="output" />
+       <beans:property name="ignoreAcceptHeader" value="false" />
+       <beans:property name="defaultContentType" value="application/json" />
+
+       <beans:property name="mediaTypes">
+          <beans:map>
+              <beans:entry key="json" value="application/json" />
+              <beans:entry key="xml" value="application/xml" />
+              <beans:entry key="html" value="text/html" />
+          </beans:map>
+       </beans:property>
+    </beans:bean>
+    ......
+</beans:beans>
+
+
+
+64.
+
+# datasource 
+spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+spring.datasource.username=sa
+spring.datasource.password=
+spring.datasource.driver-class-name=org.h2.Driver
+
+spring.jpa.hibernate.ddl-auto=none
+
+
+
+
+65.
+
+package com.multi.contactsapp.domain;
+.......
+
+@Entity
+@SequenceGenerator(name="CONTACT_SEQ_GENERATOR", 
+  sequenceName="CONTACT_SEQ", initialValue=1, allocationSize=1)
+public class Contact {
+  @Id
+  @GeneratedValue(strategy=GenerationType. SEQUENCE, generator="CONTACT_SEQ_GENERATOR")
+  private int no;
+  private String name;
+  private String tel;
+  private String address;
+  
+  //생성자, Setter, Getter 코드 자동 생성
+}
+
+
+
+66.
+
+package com.multi.contactsapp.dao;
+
+import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+
+import com.multi.contactsapp.domain.Contact;
+
+@RepositoryRestResource
+public interface ContactRepository 
+     extends  PagingAndSortingRepository<Contact, Integer> {
+
+}
+
+
+
+73.
+
+# datasource 
+spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+spring.datasource.username=sa
+spring.datasource.password=
+spring.datasource.driver-class-name=org.h2.Driver
+# mybatis config, mapper
+mybatis.config-location: classpath:mybatis-config.xml
+mybatis.mapper-locations=mapper/**/*.xml
+#Encoding UTf-8
+spring.http.encoding.charset=UTF-8
+spring.http.encoding.enabled=true
+spring.http.encoding.force=true
+spring.http.encoding.force-request=true
+spring.http.encoding.force-response=true
+
+
+
+74.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+   <typeAliases>
+       <typeAlias type="com.multi.contactsapp.domain.Contact" alias="Contact"/>
+   </typeAliases> 
+</configuration>
+
+
+
+76.
+
+package com.multi.contactsapp;
+......
+
+@RestController
+@RequestMapping(value="/contacts")
+public class ContactRestController {
+  
+  @Autowired
+  private ContactService contactService;
+
+  @RequestMapping(method=RequestMethod.GET)
+  public ContactList getContactList() {
+    return contactService.getContactList();
+  }
+
+  @RequestMapping(method = RequestMethod.POST)
+  public Result insertContact(@RequestBody Contact c) {
+    return contactService.insertContact(c);
+  } 
+}
+
+
+
+78.
+
+@Configuration
+@EnableWebMvc
+public class WebMvcConfig extends WebMvcConfigurerAdapter {
+
+  @Override
+  public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+    configurer
+      .favorPathExtension(true).favorParameter(true)
+      .ignoreAcceptHeader(true).parameterName("output")
+      .useJaf(false).defaultContentType(MediaType.APPLICATION_JSON);
+  }
+}

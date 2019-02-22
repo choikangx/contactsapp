@@ -1,0 +1,393 @@
+﻿4.
+
+public class Sample1 {
+
+  public static void main(String[] args) throws HttpException, IOException {
+    HttpClient client = new HttpClient();
+    client.getParams().setContentCharset("utf-8");
+    
+    String url = "http://tfactory.com:8000/contactsvc4/contacts?output=json";
+    GetMethod method = new GetMethod(url);
+    int status = client.executeMethod(method);
+    if (status == 200) {
+      String json = method.getResponseBodyAsString();
+      System.out.println("## 응답 데이터 : " + json);
+    } else {
+      System.out.println("## 응답 오류 : 상태 코드 => " + status);
+    }
+  }
+
+}
+
+
+5.
+
+public class Sample2 {
+
+  public static void main(String[] args) throws HttpException, IOException {
+    HttpClient client = new HttpClient();
+    client.getParams().setContentCharset("utf-8");
+    
+    String url = "http://tfactory.com:8000/contactsvc4/contacts";
+    GetMethod method = new GetMethod(url);
+    method.setRequestHeader("Accept", "application/json");
+    int status = client.executeMethod(method);
+    if (status == 200) {
+      String json = method.getResponseBodyAsString();
+      System.out.println("## 응답 데이터 : " + json);
+    } else {
+      System.out.println("## 응답 오류 : 상태 코드 => " + status);
+    }
+  }
+}
+
+
+6.
+
+public class Sample3 {
+  public static void main(String[] args) throws HttpException, IOException {
+    HttpClient client = new HttpClient();
+    client.getParams().setContentCharset("utf-8");
+    
+    String url = "http://tfactory.com:8000/contactsvc4/contacts";
+    PostMethod method = new PostMethod(url);
+    method.setParameter("name", "홍길동");
+    method.setParameter("tel", "010-3434-5678");
+    method.setParameter("address", "제주도");
+    
+    int status = client.executeMethod(method);
+    if (status == 200) {
+      String json = method.getResponseBodyAsString();
+      System.out.println("## 응답 데이터 : " + json);
+    } else {
+      System.out.println("## 응답 오류 : 상태 코드 => " + status);
+    }
+  }
+}
+
+7.
+
+public class Sample4 {
+public static void main(String[] args) throws HttpException, IOException {
+    HttpClient client = new HttpClient();
+    client.getParams().setContentCharset("utf-8");
+    
+    String url = "http://tfactory.com:8000/contactsvc4/contacts";
+    PostMethod method = new PostMethod(url);
+    method.setRequestHeader("Content-type", "application/json");
+    String jsonRequest = 
+           "{\"name\":\"이몽룡\",\"tel\":\"010-3434-7878\",\"address\":\"전북 남원\"}";
+    StringRequestEntity requestEntity = 
+          new StringRequestEntity(jsonRequest, "application/json", "UTF-8");
+    method.setRequestEntity(requestEntity);
+    
+    int status = client.executeMethod(method);
+    if (status == 200) {
+      String json = method.getResponseBodyAsString();
+      System.out.println("## 응답 데이터 : " + json);
+    } else {
+      System.out.println("## 응답 오류 : 상태 코드 => " + status);
+    }// TODO Auto-generated method stub
+  }
+}
+
+
+
+24.
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+<style>
+  table.mytable { width:500px; }
+  table.mytable > thead {   background-color: aqua; }
+  table.mytable > tbody  td { border-bottom: solid 1px gray; padding:3px 10px 3px 10px; }
+  div.myinput { padding-bottom: 3px; }
+  div.box { padding: 20px; }
+</style>
+<script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+$(function() {
+  var BASEURL = "/contactsvc4/contacts";
+  function viewContactList () {
+    $("#list").empty();
+    $.ajax({ 
+        type:"GET", url:BASEURL, dataType:"json", contentType:"application/json" 
+    }).done(function(data) {
+      var str = "";
+      for (var i=0; i < data.contacts.length; i++) {
+        var c = data.contacts[i];
+        str += "<tr>";
+        str += "<td>" + c.no + "</td>";
+        str += "<td>" + c.name + "</td>";
+        str += "<td>" + c.tel + "</td>";
+        str += "<td>" + c.address + "</td>";
+        str += "</tr>";
+      }
+      $("#list").append(str);
+    })
+  }
+  $("#add").click(function() {
+    var param = {};
+    param.name = $("#name").val();
+    param.tel = $("#tel").val();
+    param.address = $("#address").val();
+    
+    $.ajax({ 
+      type:"POST", url:BASEURL, data:JSON.stringify(param), contentType:"application/json"
+    }).done(function(data) {
+      if (data.status=="ok") {
+        viewContactList();
+        $("#f1")[0].reset();
+      } else {
+        alert("연락처 추가중  오류 발생 : " + data.message);
+      }
+    })
+  })
+  $("#update").click(function() {
+    var param = {};
+    param.name = $("#name").val();
+    param.tel = $("#tel").val();
+    param.address = $("#address").val();
+    var url = BASEURL + "/" + $("#no").val();
+    $.ajax({
+      type:"PUT", url:url, data:JSON.stringify(param), contentType:"application/json"
+    }).done(function(data) {
+      if (data.status=="ok") {
+        viewContactList();
+        $("#f1")[0].reset();
+      } else {
+        alert("연락처 수정중  오류 발생 : " + data.message);
+      }
+    })
+  })
+  viewContactList();
+})
+</script>
+</head>
+<body>
+  <div>
+    <div class="box">
+      <form id="f1" method="post" action="add.do">
+          <div class="myinput">번호 : <input type="text" id="no" name="no" /></div>
+          <div class="myinput">이름 : <input type="text" id="name" name="name" /></div>
+          <div class="myinput">전화 : <input type="text" id="tel" name="tel" /></div>
+          <div class="myinput">주소 : <input type="text" id="address" name="address" /></div>
+      </form> 
+      <button id="add">추가</button>button id="update">수정</button>
+    </div>
+    <div  style="margin:10px 10px 10px 10px; ">
+      <table class="mytable">
+        <thead>
+          <tr><th>번호</th><th>성명</th><th>전화</th><th>주소</th></tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
+
+
+
+
+36.
+
+<dependency>
+    <groupId>org.mitre.dsmiley.httpproxy</groupId>
+    <artifactId>smiley-http-proxy-servlet</artifactId>
+    <version>1.10</version>
+</dependency>
+
+
+
+37.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://java.sun.com/xml/ns/javaee"
+    xsi:schemaLocation="http://java.sun.com/xml/ns/javaee   
+       http://java.sun.com/xml/ns/javaee/web-app_4_0.xsd"  version="4.0">
+  <servlet>
+    <servlet-name>proxy</servlet-name>
+    <servlet-class>org.mitre.dsmiley.httpproxy.ProxyServlet
+    </servlet-class>
+    <init-param>
+      <param-name>targetUri</param-name>
+      <param-value>http://tfactory.com:8000/contactsvc4</param-value>
+    </init-param>
+    <init-param>
+      <param-name>log</param-name>
+      <param-value>true</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>proxy</servlet-name>
+    <url-pattern>/api/*</url-pattern>
+  </servlet-mapping>
+</web-app>
+
+
+42.
+
+package com.multi.contactsapp;
+
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.AbstractJsonpResponseBodyAdvice;
+
+@ControllerAdvice
+public class JsonpAdvice extends AbstractJsonpResponseBodyAdvice {
+    public JsonpAdvice() {
+        super("callback");
+    }
+} 
+
+
+
+44.
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+<script type="text/javascript">
+  function test(data) {
+     console.log("## JSONP 작동 방식 이해!!")
+     console.log(data);
+  }
+</script>
+<script type="text/javascript" 
+    src="http://tfactory.com:8000/contactsvc4/contacts?output=json&callback=test"></script>
+</head>
+<body>
+   <h2>Console Log를 확인하세요</h2>
+</body>
+</html>
+
+
+45.
+
+var url1 = "http://tfactory.com:8000/contactsvc4/contacts";
+$.ajax({
+   url : url1, 
+   type:"GET",
+   dataType : "jsonp",
+   jsonp : "callback",
+   data : { output:"json" }
+}).done(function(data) {
+   console.log("##JSONP 실행 $.ajax() 함수 이용!!");
+   console.log(data);
+})
+
+......
+var url2 = "http://tfactory.com:8000/contactsvc4/contacts?callback=?";
+$.getJSON(url2, { output:"json" }, function(data) {
+   console.log("##JSONP 실행 $.getJSON() 함수 이용!!");
+   console.log(data);
+}) 
+
+
+
+52.
+
+@CrossOrigin(origins="http://jcornor.com:8000")
+@RequestMapping(method = RequestMethod.GET)
+public ContactList getContactList() {
+   return contactService.getContactList();
+}
+
+-------------------------
+@CrossOrigin(origins="http://jcornor.com:8000")
+@RestController
+@RequestMapping(value="contacts")
+public class ContactRestController {
+   @Autowired
+   private ContactService contactService;
+   @RequestMapping(method = RequestMethod.GET)
+   public ContactList getContactList() {
+      return contactService.getContactList();
+   }
+}
+
+---------------------
+
+@CrossOrigin Anntation 옵션
+origins : 허용할 Origin 리스트. 콤마로 구분하여 여러개 지정 가능
+methods : 지원할 Method 지정
+allowedHeaders: 허용할 Header를 지정함. 생략하거나 *를 지정하면 모든 헤더를 허용한다는 의미
+allowCredentials: true로 지정하면 Reflight 요청시에 Access-Control-Allow-Credentials 헤더를 true로 지정해 요청함.
+maxAge : Preflight Request의 결과가 캐쉬에 얼마나 오래동안 남아있을지를 지정
+
+
+
+53.
+
+@Configuration
+@EnableWebMvc
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**");
+    }
+}
+
+---------------
+
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+   registry.addMapping("/api/**")
+      .allowedOrigins("http://client:8000,http://jcornor.com:8000")
+      .allowedMethods("GET","POST","PUT","DELETE","HEAD")
+      .allowCredentials(true)
+      .maxAge(3600);
+}
+
+
+
+54.
+
+<cors>
+
+   <mapping path="/**" 
+        allowed-origins="http://jcornor.com:8000, http://localhost:8000"
+        allowed-headers="Origin, Content-Type, X-Requested-With, 
+             Accept, Access-Control-Request-Method, 
+             Access-Control-Request-Headers, Authorization"
+        allowed-methods="GET, POST, PUT, DELETE, HEAD, OPTIONS"
+        allow-credentials="true" />
+
+   <mapping path="/accounts/**"
+        allowed-origins="http://client:8000" />
+
+</cors>
+
+
+
+55.
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+<script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+$(function() {
+   //var url = "http://tfactory.com:8080/contacts?output=json";
+   var url = "http://tfactory.com:8000/contactsvc4/contacts?output=json";
+   $.get(url, function(data) {
+      console.log(data);
+   })
+})
+</script>
+</head>
+<body>
+   <h2>Console Log를 확인합니다.</h2>
+</body>
+</html>
+
+
+

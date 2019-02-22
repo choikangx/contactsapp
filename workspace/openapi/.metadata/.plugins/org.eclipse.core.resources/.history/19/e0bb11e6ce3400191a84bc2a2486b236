@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>API KEY Client</title>
+<script src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+$(function() {
+	$("#getContacts").click(function() {
+		var param = { key : "2b220f59568ead73351ca7e468aeb8c1xx" };
+		$("#list").empty();
+		$.get("http://tfactory.com:8000/APIKeyServer/contacts", param, function(data) {
+			console.log(data);
+			if (data.contacts != null) {
+				var str = "";
+				for (var i=0; i < data.contacts.length; i++) {
+					var c = data.contacts[i];
+					str+= `<div>${c.no}: ${c.name}, ${c.tel}, ${c.address}</div>`;
+				}
+				$("#list").append(str);
+			} else {
+				$("#list").append(JSON.stringify(data));
+			}
+		})
+	})
+})
+</script>
+</head>
+<body>
+	<div>
+		<button id="getContacts">연락처 조회하기</button>
+		<div id="list"></div>
+	</div>
+</body>
+</html>

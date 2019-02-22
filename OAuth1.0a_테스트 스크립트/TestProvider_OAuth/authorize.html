@@ -1,0 +1,24 @@
+<html>
+<head>
+	<title> Get Authorized</title>
+	<script type="text/javascript">
+	
+		function getAuthrized() {
+			
+			//var url = "https://api.twitter.com/oauth/authorize";
+			//var url = "http://localhost:8000/tSimpleProvider/auth/authorize";
+			var url = "http://tfactory.com:8000/tSimpleProvider/auth/authorize";
+			url = url + "?oauth_token=" + 
+			document.getElementById("request-token").value;
+
+			window.location = url;
+
+		}
+
+	</script>
+</head>
+<body>
+	<input id="request-token" type="text"/>
+	<button onclick="getAuthrized()"> Get Authorized </button>
+</body>
+</html>

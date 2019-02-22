@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+<script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+<script type="text/javascript">
+$(function() {
+ 	var url1 = "http://tfactory.com:8000/contactsvc4/contacts";
+	$.ajax({
+		url : url1, 
+		type:"GET",
+		dataType : "jsonp",
+		jsonp : "callback",
+		data : { output:"json" },
+	}).done(function(data) {
+		console.log("##JSONP 실행 $.ajax() 함수 이용!!");
+		console.log(data);
+	})
+	
+/* 	var url2 = "http://tfactory.com:8000/contactsvc4/contacts?callback=?";
+	$.getJSON(url2, { output:"json" }, function(data) {
+		console.log("##JSONP 실행 $.getJSON() 함수 이용!!");
+		console.log(data);
+	}) */
+})
+</script>
+</head>
+<body>
+	<h2>Console Log를 확인하세요</h2>
+</body>
+</html>
